@@ -1,7 +1,7 @@
 #!/bin/bash
 #pf.sh
 #Внесение данных для печати извещений ф.22
-#Version 1.2
+#Version 1.3
 
 #Начало записи лога
 date "+%A %d %B %Y %T" >> log;
@@ -13,6 +13,7 @@ param=;
 blank=;
 form=;
 quantity=;
+fake=;
 lock=1;
 rpo=;
 input=;
@@ -85,6 +86,11 @@ case $param in
 	shift;
 	i=$(($i+1));
 	continue;;
+( -f | --fake )
+	fake=fake;
+	shift;
+	i=$(($i+1));
+	continue;;
 ( -h | --help )
 	cat readme;
 	exit;;
@@ -96,10 +102,14 @@ done;
 fi;
 if [ -z $quantity ]; then quantity=100; fi;
 if [ -z $blank ] && [ -z $form ]; then blank=2; fi;
-if [ -z $blank ] && [ -n $form ]; then blank=2; fi;
+if [ -z $blank ] && [ -n "$form" ]; then blank=2; fi;
 if [ -z $form ] && [ $blank = 2 ]; then form=n; fi;
 if [ $blank = 1 ] && [ "${#form}" -gt 0 ]; then 
 	echo "Параметры -t|--old|--new могут устанавливаться только совместно с параметром --blank 2";
+	exit;
+fi;
+if [ -n "$fake" ] && [ $blank = 1 ]; then
+	echo "Параметр $fake может применяться только совместно с параметром --blank=2";
 	exit;
 fi;
 
@@ -116,8 +126,8 @@ tar -xjf work.tar.bz2;
 #Ввод данных
 #
 #Создание файла данных
-sed -n 1p begin$blank$form >> content.xml;
-echo -n `sed -n 2p begin$blank$form` >> content.xml;
+sed -n 1p begin$blank$form$fake >> content.xml;
+echo -n `sed -n 2p begin$blank$form$fake` >> content.xml;
 clear;
 echo "Количество: $quantity" >> ../log;
 echo -n "Начало ввода: " >> ../log;
@@ -445,60 +455,60 @@ done;;
 2 )
 case $form in
 	o )
-	for (( i=1; $i<=33; i++ )); do
+	for (( i=1; $i<=32; i++ )); do
 		case $i in
-		2 ) echo -n $input >> content.xml;;
-		4 ) echo -n "$family " >> content.xml;;
-		5 ) echo -n $initials >> content.xml;;
-		7 ) echo -n "$street ">> content.xml;;
-		8 ) echo -n "$house-" >> content.xml;;
-		9 ) echo -n $flat >> content.xml;;
-		11 ) echo -n "${rpo_array[0]} " >> content.xml;;
-		13 ) echo -n "${rpo_array[1]} " >> content.xml;;
-		15 ) echo -n "${rpo_array[2]} " >> content.xml;;
-		16 ) echo -n "${rpo_array[3]} " >> content.xml;;
-		18 ) echo -n "${rpo_array[4]} " >> content.xml;;
-		19 ) echo -n "${rpo_array[5]}" >> content.xml;;
-		21 ) echo -n "${rpo_array[6]} " >> content.xml;;
-		22 ) echo -n "${rpo_array[7]}" >> content.xml;;
-		24 ) echo -n "${rpo_array[8]} " >> content.xml;;
-		25 ) echo -n "${rpo_array[9]} " >> content.xml;;
-		27 ) echo -n "${rpo_array[10]} " >> content.xml;;
-		29 ) echo -n "${rpo_array[11]} " >> content.xml;;
-		30 ) echo -n "${rpo_array[12]}" >> content.xml;;
-		32 ) echo -n "${rpo_array[13]}" >> content.xml;;
+		1 ) echo -n $input >> content.xml;;
+		3 ) echo -n "$family " >> content.xml;;
+		4 ) echo -n $initials >> content.xml;;
+		6 ) echo -n "$street ">> content.xml;;
+		7 ) echo -n "$house-" >> content.xml;;
+		8 ) echo -n $flat >> content.xml;;
+		10 ) echo -n "${rpo_array[0]} " >> content.xml;;
+		12 ) echo -n "${rpo_array[1]} " >> content.xml;;
+		14 ) echo -n "${rpo_array[2]} " >> content.xml;;
+		15 ) echo -n "${rpo_array[3]} " >> content.xml;;
+		17 ) echo -n "${rpo_array[4]} " >> content.xml;;
+		18 ) echo -n "${rpo_array[5]}" >> content.xml;;
+		20 ) echo -n "${rpo_array[6]} " >> content.xml;;
+		21 ) echo -n "${rpo_array[7]}" >> content.xml;;
+		23 ) echo -n "${rpo_array[8]} " >> content.xml;;
+		24 ) echo -n "${rpo_array[9]} " >> content.xml;;
+		26 ) echo -n "${rpo_array[10]} " >> content.xml;;
+		28 ) echo -n "${rpo_array[11]} " >> content.xml;;
+		29 ) echo -n "${rpo_array[12]}" >> content.xml;;
+		31 ) echo -n "${rpo_array[13]}" >> content.xml;;
 		* ) echo -n `sed -n "$i"p middle_var$blank$form` >> content.xml;;
 		esac;
 	done;;
 	n )
-	for (( i=1; $i<=28; i++ )); do
+	for (( i=1; $i<=27; i++ )); do
 		case $i in
-		2 ) echo -n $input >> content.xml;;
-		4 ) echo -n "$family " >> content.xml;;
-		5 ) echo -n $initials >> content.xml;;
-		7 ) echo -n "$street ">> content.xml;;
-		8 ) echo -n "$house-" >> content.xml;;
-		9 ) echo -n $flat >> content.xml;;
-		11 ) echo -n "${rpo_array[0]} " >> content.xml;;
-		12 ) echo -n "${rpo_array[1]} " >> content.xml;;
-		13 ) echo -n "${rpo_array[2]} " >> content.xml;;
-		14 ) echo -n "${rpo_array[3]} " >> content.xml;;
-		15 ) echo -n "${rpo_array[4]} " >> content.xml;;
-		16 ) echo -n "${rpo_array[5]}" >> content.xml;;
-		18 ) echo -n "${rpo_array[6]} " >> content.xml;;
-		19 ) echo -n "${rpo_array[7]}" >> content.xml;;
-		21 ) echo -n "${rpo_array[8]} " >> content.xml;;
-		22 ) echo -n "${rpo_array[9]} " >> content.xml;;
-		23 ) echo -n "${rpo_array[10]} " >> content.xml;;
-		24 ) echo -n "${rpo_array[11]} " >> content.xml;;
-		25 ) echo -n "${rpo_array[12]}" >> content.xml;;
-		27 ) echo -n "${rpo_array[13]}" >> content.xml;;
+		1 ) echo -n $input >> content.xml;;
+		3 ) echo -n "$family " >> content.xml;;
+		4 ) echo -n $initials >> content.xml;;
+		6 ) echo -n "$street ">> content.xml;;
+		7 ) echo -n "$house-" >> content.xml;;
+		8 ) echo -n $flat >> content.xml;;
+		10 ) echo -n "${rpo_array[0]} " >> content.xml;;
+		11 ) echo -n "${rpo_array[1]} " >> content.xml;;
+		12 ) echo -n "${rpo_array[2]} " >> content.xml;;
+		13 ) echo -n "${rpo_array[3]} " >> content.xml;;
+		14 ) echo -n "${rpo_array[4]} " >> content.xml;;
+		15 ) echo -n "${rpo_array[5]}" >> content.xml;;
+		17 ) echo -n "${rpo_array[6]} " >> content.xml;;
+		18 ) echo -n "${rpo_array[7]}" >> content.xml;;
+		20 ) echo -n "${rpo_array[8]} " >> content.xml;;
+		21 ) echo -n "${rpo_array[9]} " >> content.xml;;
+		22 ) echo -n "${rpo_array[10]} " >> content.xml;;
+		23 ) echo -n "${rpo_array[11]} " >> content.xml;;
+		24 ) echo -n "${rpo_array[12]}" >> content.xml;;
+		26 ) echo -n "${rpo_array[13]}" >> content.xml;;
 		* ) echo -n `sed -n "$i"p middle_var$blank$form` >> content.xml;;
 		esac;
 	done;;
 esac;
 esac;
-if [ $counter != $quantity ]; then echo -n `cat middle_const$blank$form` >> content.xml; fi;
+if [ $counter != $quantity ]; then echo -n `cat middle_const$blank$form$fake` >> content.xml; fi;
 input=$(($input+1));
 
 #Формирование графического штрих-кода
@@ -515,7 +525,6 @@ killall zbarcam;
 sleep 1;
 
 #Формирование выходного файла и печать
-#(Оптимизировано только для бланков вторичных извещений нового образца!)
 
 rm notice/content.xml;
 cp content.xml notice/;
@@ -526,12 +535,22 @@ libreoffice --invisible --print-to-file notice.odt;
 cp notice.ps ../
 cd ..
 ghostscript  -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=jpeg -r150 -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -dMaxStripSize=8192 -sOutputFile=page-%d.jpg notice.ps
+if [ $blank = 1 ]; then
+	temp1=+200;
+	temp2=+55;
+elif [ "$form" = "n" ]; then
+	temp1=+310;
+	temp2=+5;
+elif [ "$form" = "o" ]; then
+	temp1=+310;
+	temp2=+36;
+fi;
 for (( counter=1; $counter<=$quantity; counter++ )); do
 ghostscript  -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=tiff24nc -r200 -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -dMaxStripSize=8192 -sOutputFile=rpo_$counter.tif rpo_$counter.pdf;
 convert rpo_$counter.tif -gravity SouthWest -crop 310x100+0+0 rpo_crop_$counter.tif;
 #convert -resize 30% rpo_crop_$counter.jpg rpo_small_$counter.jpg;
 convert rpo_crop_$counter.tif -transparent "rgb(255,255,255)" rpo_transparent_$counter.tif
-composite -compose atop -geometry +310+5 rpo_transparent_$counter.tif page-$counter.jpg notice-$counter.tif;
+composite -compose atop -geometry $temp1$temp2 rpo_transparent_$counter.tif page-$counter.jpg notice-$counter.tif;
 done;
 if [ $quantity -gt 99 ]; then quantity=99; fi;
 for (( counter=1; $counter<=$quantity; counter++ )); do
