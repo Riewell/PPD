@@ -1,0 +1,384 @@
+#!/bin/bash
+#pf.sh
+#Внесение данных для печати извещений ф.22
+#Version 1.0
+
+#Начало записи лога
+date "+%A %d %B %Y %T" >> log;
+
+#Инициализация переменных
+declare -a rpo_array[14];
+pos_param=;
+param=;
+blank=;
+form=;
+quantity=;
+lock=1;
+rpo=;
+input=;
+family=;
+initials=;
+street=;
+flat=;
+temp=;
+temp2=;
+temp3=;
+length=;
+#Инициализация переменных счётчиков
+counter=;
+i=;
+j=0;
+
+#Считывание позиционных параметров
+pos_param=$#;
+if [ $pos_param != 0 ]; then
+for (( i=0; $i<$pos_param; i++ )); do
+param=$1;
+case $param in
+( -b | --blank )
+	shift;
+	if [ -z $1 ]; then
+		cat readme;
+		exit;
+	fi;
+	if [ $1 = 1 ] || [ $1 = 2 ]; then
+		 blank=$1;
+	else
+		cat readme;
+		exit;
+	fi;
+	shift;
+	i=$(($i+1));
+	continue;;
+( -t | --old | --new )
+	if [ $param = "-t" ]; then
+		shift;
+		if [ -z $1 ]; then
+			cat readme;
+			exit;
+		fi;
+		if [ $1 = "o" ] || [ $1 = "n" ]	; then
+		form=$1;
+		else
+			cat readme;
+			exit;
+		fi;
+	elif [ $param = "--old" ]; then form=o;
+	elif [ $param = "--new" ];then form=n;
+	fi;
+	shift;
+	i=$(($i+1));
+	continue;;
+( -q | --quantity )
+	shift;
+	if [ -z $1 ]; then
+		cat readme;
+		exit;
+	fi;
+	if [ $1 -gt 0 ]; then
+		quantity=$1;
+	else
+		cat readme;
+		exit;
+	fi;
+	shift;
+	i=$(($i+1));
+	continue;;
+( -h | --help )
+	cat readme;
+	exit;;
+	* ) head -n 2 readme;
+	exit;;
+esac;
+shift;
+done;
+fi;
+if [ -z $quantity ]; then quantity=100; fi;
+if [ -z $blank ] && [ -z $form ]; then blank=2; fi;
+if [ -z $blank ] && [ -n $form ]; then blank=2; fi;
+if [ -z $form ] && [ $blank = 2 ]; then form=n; fi;
+if [ $blank = 1 ] && [ "${#form}" -gt 0 ]; then 
+	echo "Параметры -t|--old|--new могут устанавливаться только совместно с параметром --blank 2";
+	exit;
+fi;
+
+while [ -a lock$lock ]; do
+lock=$(($lock+1));
+done;
+echo $quantity >> lock$lock;
+mkdir work$lock;
+cp work.tar.bz2 work$lock/;
+cd work$lock/;
+tar -xjf work.tar.bz2;
+
+#
+#Ввод данных
+#
+#Создание файла данных
+sed -n 1p begin$blank$form >> content.xml;
+echo -n `sed -n 2p begin$blank$form` >> content.xml;
+clear;
+echo "Количество: $quantity" >> ../log;
+echo -n "Начало ввода: " >> ../log;
+date +%T >> ../log;
+
+#Считывание ШПИ через веб-камеру
+zbarcam --nodisplay --raw >> rpo.txt &
+
+for (( counter=1; $counter<=$quantity; counter++ )); do
+temp=;
+temp2=;
+temp3=;
+j=0;
+echo "Введите ШПИ:";
+while [ "`tail -n 1 rpo.txt`" = "$rpo" ] && [ $j -lt 6 ]; do
+	sleep 1;
+	j=$(($j+1));
+done;
+if [ "$rpo" = "`tail -n 1 rpo.txt`" ]; then
+	echo -n "Ошибка считывания. Введите ШПИ вручную: ";
+	read rpo;
+	echo $rpo >> rpo.txt;
+	else rpo=`tail -n 1 rpo.txt`;
+fi;
+if [ "${#rpo}" -lt 14 ]; then
+		echo "Ошибка ввода. Попробуйте ещё раз.";
+		counter=$(($counter-1));	
+		continue;
+fi;
+if [ "${rpo:0:6}" = 102466 ] || [ "${rpo:0:6}" = 102469 ] || [ "${rpo:0:6}" = 102470 ] || [ "${rpo:0:6}" = 102471 ] || [ "${rpo:0:6}" = 102472 ] || [ "${rpo:0:6}" = 102473 ]; then
+	for (( i=0; $i<14; i++ )); do
+		rpo_array[$i]="${rpo:$i:1}";
+	done;
+	for (( i=0; $i<13; i=$(($i+2)) )); do
+		temp2=$(($temp2+${rpo_array[$i]}));
+	done;
+		temp2=$(($temp2*3));
+	for (( i=1; $i<12; i=$(($i+2)) )); do
+		temp3=$(($temp3+${rpo_array[$i]}));
+	done;
+	temp2=$(($temp2+$temp3));
+	temp3=0;
+	temp=$temp2;
+	while (($temp2%10)); do
+		temp3=$(($temp3+1));
+		temp2=$(($temp+$temp3));
+	done;
+	if [ "${rpo_array[13]}" != "$temp3" ]; then
+		echo "Ошибка ввода. Попробуйте ещё раз.";
+		counter=$(($counter-1));	
+		continue;
+	fi;
+	else
+	echo "Ошибка ввода. Попробуйте ещё раз.";
+	counter=$(($counter-1));	
+	continue;
+fi;
+echo $rpo;
+echo "Введите входящий номер [$input]:";
+read temp;
+if [ "$temp" != "" ]; then input=$temp; fi;
+echo "Введите фамилию [$family]:";
+read temp;
+if [ "$temp" != "" ]; then
+	if [ "${temp:2:1}" = "" ] && ([ "${temp:1:1}" = "+" ] || [ "${temp:1:1}" = "-" ]  || [ "${temp:1:1}" = "=" ]); then
+		echo "Ошибка ввода. Попробуйте ещё раз";
+		counter=$(($counter-1));
+		continue;
+	elif ([ "${temp:0:1}" = "+" ] || [ "${temp:0:1}" = "=" ]) && [ "${temp:1:1}" != "-" ] && [ "${temp:1:1}" != "" ]; then
+		temp=`echo $temp| sed 's/\(+*=*\)\([а-я]*\)/\2/'`;
+		if [ "`echo $family| sed 's/\([А-Яа-я]*\)\(-*\)\([А-Яа-я]*\)/\3/'`" != "" ]; then
+			family=`echo $family| sed "s/\([А-Яа-я]*\)-\([А-Яа-я]*\)/\1$temp-\2$temp/"`;
+		else family=$family$temp;
+		fi;
+	elif ([ "${temp:0:1}" = "+" ] || [ "${temp:0:1}" = "=" ])  && [ "${temp:1:1}" = "-" ] && [ "${temp:2:1}" != "" ]; then
+		temp=`echo $temp| sed 's/\(+*=*\)\(-\)\([а-я]*\)/\u\3/'`;
+		family="$family-$temp";
+	elif [ "${temp:0:1}" = "-" ] && [ "${temp:1:1}" != "-" ] && [ "${temp:1:1}" != "" ]; then 
+		temp=`echo $temp| sed 's/\(-\)\([а-я]*\)/\2/'`;
+		if [ "`echo $family| sed 's/\([А-Яа-я]*\)\(-*\)\([А-Яа-я]*\)/\3/'`" != "" ]; then
+		family=`echo $family| sed "s/\([А-Яа-я]*\)\($temp\)-\([А-Яа-я]*\)\($temp\)/\1-\3/"`;
+		else
+		family=`echo $family| sed "s/\([а-я]*\)\($temp\)/\1/"`;
+		fi;
+	elif [ "${temp:0:1}" = "-" ] && [ "${temp:1:1}" = "-" ] && [ "${temp:2:1}" != "" ]; then
+		temp=`echo $temp| sed 's/\(-\)\(-\)\([а-я]*\)/\2\u\3/'`;
+		family=`echo $family| sed "s/\([а-я]*\)\($temp\)/\1/"`;
+	else family=`echo $temp| sed "s/[а-я]/\u&/"`;
+	fi;
+fi;
+echo "Введите инициалы [$initials]:";
+read temp;
+if [ "$temp" != "" ]; then
+	length=`echo "${#temp}"`;
+	if [ $length = 3 ]; then initials=`echo $temp| sed 's/\([а-я]\) \([а-я]\)/\u\1. \u\2./'`;
+	elif [ $length = 5 ]; then initials=`echo $temp|sed 's/\([а-я]\) \([а-я]\) \([а-я]\)/\u\1. \u\2.-\3./'`;
+	else echo "Ошибка ввода. Попробуйте ещё раз";
+	counter=$(($counter-1));
+	continue;
+	fi;
+fi;
+echo "Введите улицу [$street]:";
+read temp;
+if [ "$temp" != "" ]; then
+length=`echo "${#temp}"`;
+for (( i=0; $i<$length; i++ )); do
+if [ "${temp:$i:1}" = ' ' ]; then
+	if [ $i = 1 ]; then
+	street=`echo $temp| sed 's/\([а-я]\) \([а-я]*\)/\1. \u\2/'`;
+	break;
+	else street=`echo $temp| sed 's/\([а-я]*\) \([а-я]*\)/\u\1 \u\2/'`;
+	break;
+	fi;
+fi;
+done;
+if [ $i = $length ]; then street=`echo $temp| sed "s/[а-я]/\u&/"`; fi;
+fi;
+echo "Введите номер дома [$house]:";
+read temp;
+if [ "$temp" != "" ]; then house=$temp; fi;
+echo "Введите квартиру [$flat]:";
+read temp;
+if [ "$temp" != "" ]; then flat=$temp; fi;
+
+#Проверка правильности ввода
+
+clear;
+echo $input;
+echo $family $initials;
+echo $street $house\-$flat;
+echo $rpo;
+echo;
+echo "Всё верно [Д/н]?";
+read temp;
+if [ "$temp" != "" ] && ( [ $temp = "Н" ] || [ $temp = "н" ] ); then counter=$(($counter-1)); continue; fi;
+
+#Запись данных в файл
+
+case $blank in
+1 )
+for (( i=1; $i<=36; i++ )); do
+	case $i in
+	2 ) echo -n $input >> content.xml;;
+	4 ) echo -n "$family " >> content.xml;;
+	5 ) echo -n $initials >> content.xml;;
+	7 ) echo -n "$street ">> content.xml;;
+	8 ) echo -n "$house-" >> content.xml;;
+	9 ) echo -n $flat >> content.xml;;
+	11 ) echo -n "${rpo_array[0]} " >> content.xml;;
+	12 ) echo -n "${rpo_array[1]} " >> content.xml;;
+	14 ) echo -n "${rpo_array[2]} " >> content.xml;;
+	16 ) echo -n "${rpo_array[3]} " >> content.xml;;
+	18 ) echo -n "${rpo_array[4]} " >> content.xml;;
+	20 ) echo -n "${rpo_array[5]}" >> content.xml;;
+	22 ) echo -n "${rpo_array[6]} " >> content.xml;;
+	24 ) echo -n "${rpo_array[7]}" >> content.xml;;
+	26 ) echo -n "${rpo_array[8]} " >> content.xml;;
+	27 ) echo -n "${rpo_array[9]} " >> content.xml;;
+	29 ) echo -n "${rpo_array[10]} " >> content.xml;;
+	31 ) echo -n "${rpo_array[11]} " >> content.xml;;
+	33 ) echo -n "${rpo_array[12]}" >> content.xml;;
+	35 ) echo -n "${rpo_array[13]}" >> content.xml;;
+	* ) echo -n `sed -n "$i"p middle_var$blank$form` >> content.xml;;
+	esac;
+done;;
+2 )
+case $form in
+	o )
+	for (( i=1; $i<=33; i++ )); do
+		case $i in
+		2 ) echo -n $input >> content.xml;;
+		4 ) echo -n "$family " >> content.xml;;
+		5 ) echo -n $initials >> content.xml;;
+		7 ) echo -n "$street ">> content.xml;;
+		8 ) echo -n "$house-" >> content.xml;;
+		9 ) echo -n $flat >> content.xml;;
+		11 ) echo -n "${rpo_array[0]} " >> content.xml;;
+		13 ) echo -n "${rpo_array[1]} " >> content.xml;;
+		15 ) echo -n "${rpo_array[2]} " >> content.xml;;
+		16 ) echo -n "${rpo_array[3]} " >> content.xml;;
+		18 ) echo -n "${rpo_array[4]} " >> content.xml;;
+		19 ) echo -n "${rpo_array[5]}" >> content.xml;;
+		21 ) echo -n "${rpo_array[6]} " >> content.xml;;
+		22 ) echo -n "${rpo_array[7]}" >> content.xml;;
+		24 ) echo -n "${rpo_array[8]} " >> content.xml;;
+		25 ) echo -n "${rpo_array[9]} " >> content.xml;;
+		27 ) echo -n "${rpo_array[10]} " >> content.xml;;
+		29 ) echo -n "${rpo_array[11]} " >> content.xml;;
+		30 ) echo -n "${rpo_array[12]}" >> content.xml;;
+		32 ) echo -n "${rpo_array[13]}" >> content.xml;;
+		* ) echo -n `sed -n "$i"p middle_var$blank$form` >> content.xml;;
+		esac;
+	done;;
+	n )
+	for (( i=1; $i<=28; i++ )); do
+		case $i in
+		2 ) echo -n $input >> content.xml;;
+		4 ) echo -n "$family " >> content.xml;;
+		5 ) echo -n $initials >> content.xml;;
+		7 ) echo -n "$street ">> content.xml;;
+		8 ) echo -n "$house-" >> content.xml;;
+		9 ) echo -n $flat >> content.xml;;
+		11 ) echo -n "${rpo_array[0]} " >> content.xml;;
+		12 ) echo -n "${rpo_array[1]} " >> content.xml;;
+		13 ) echo -n "${rpo_array[2]} " >> content.xml;;
+		14 ) echo -n "${rpo_array[3]} " >> content.xml;;
+		15 ) echo -n "${rpo_array[4]} " >> content.xml;;
+		16 ) echo -n "${rpo_array[5]}" >> content.xml;;
+		18 ) echo -n "${rpo_array[6]} " >> content.xml;;
+		19 ) echo -n "${rpo_array[7]}" >> content.xml;;
+		21 ) echo -n "${rpo_array[8]} " >> content.xml;;
+		22 ) echo -n "${rpo_array[9]} " >> content.xml;;
+		23 ) echo -n "${rpo_array[10]} " >> content.xml;;
+		24 ) echo -n "${rpo_array[11]} " >> content.xml;;
+		25 ) echo -n "${rpo_array[12]}" >> content.xml;;
+		27 ) echo -n "${rpo_array[13]}" >> content.xml;;
+		* ) echo -n `sed -n "$i"p middle_var$blank$form` >> content.xml;;
+		esac;
+	done;;
+esac;
+esac;
+if [ $counter != $quantity ]; then echo -n `cat middle_const$blank$form` >> content.xml; fi;
+input=$(($input+1));
+
+#Формирование графического штрих-кода
+
+barcode -b $rpo -g 100x20 -u mm -o rpo_$counter.pdf;
+#barcode -b $rpo -o rpo_$counter.pdf;
+#barcode -b $rpo -g 40x10 -u mm -o rpo_$counter.pdf;
+done;
+
+echo -n "Окончание ввода: " >> ../log;
+date +%T >> ../log;
+echo -n `cat end` >> content.xml;
+killall zbarcam;
+sleep 1;
+
+#Формирование выходного файла и печать
+#(Оптимизировано только для бланков вторичных извещений нового образца!)
+
+rm notice/content.xml;
+cp content.xml notice/;
+cd notice/;
+7z a -tzip notice.zip;
+mv notice.zip notice.odt;
+libreoffice --invisible --print-to-file notice.odt;
+cp notice.ps ../
+cd ..
+ghostscript  -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=jpeg -r150 -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -dMaxStripSize=8192 -sOutputFile=page-%d.jpg notice.ps
+for (( counter=1; $counter<=$quantity; counter++ )); do
+ghostscript  -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=tiff24nc -r200 -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -dMaxStripSize=8192 -sOutputFile=rpo_$counter.tif rpo_$counter.pdf;
+convert rpo_$counter.tif -gravity SouthWest -crop 310x100+0+0 rpo_crop_$counter.tif;
+#convert -resize 30% rpo_crop_$counter.jpg rpo_small_$counter.jpg;
+convert rpo_crop_$counter.tif -transparent "rgb(255,255,255)" rpo_transparent_$counter.tif
+composite -compose atop -geometry +310+5 rpo_transparent_$counter.tif page-$counter.jpg notice-$counter.tif;
+done;
+if [ $quantity -gt 99 ]; then quantity=99; fi;
+for (( counter=1; $counter<=$quantity; counter++ )); do
+mv notice-$counter.tif notice-$(printf %03d $counter).tif;
+done;
+convert notice-*.tif Notices.pdf;
+lp -orientation-requested=3 Notices.pdf;
+echo -n "Начало печати: " >> ../log;
+date +%T >> ../log;
+echo >> ../log;
