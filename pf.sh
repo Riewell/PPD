@@ -1,7 +1,7 @@
 #!/bin/bash
 #pf.sh
 #Внесение данных для печати извещений ф.22
-#Version 1.0
+#Version 1.1
 
 #Начало записи лога
 date "+%A %d %B %Y %T" >> log;
@@ -146,7 +146,7 @@ if [ "${#rpo}" -lt 14 ]; then
 		counter=$(($counter-1));	
 		continue;
 fi;
-if [ "${rpo:0:6}" = 102466 ] || [ "${rpo:0:6}" = 102469 ] || [ "${rpo:0:6}" = 102470 ] || [ "${rpo:0:6}" = 102471 ] || [ "${rpo:0:6}" = 102472 ] || [ "${rpo:0:6}" = 102473 ]; then
+if [ "${rpo:0:6}" = 102536 ] || [ "${rpo:0:6}" = 102743 ] || [ "${rpo:0:6}" = 102428 ] || [ "${rpo:0:6}" = 102453 ] || [ "${rpo:0:6}" = 102466 ] || [ "${rpo:0:6}" = 102469 ] || [ "${rpo:0:6}" = 102470 ] || [ "${rpo:0:6}" = 102471 ] || [ "${rpo:0:6}" = 102472 ] || [ "${rpo:0:6}" = 102473 ]; then
 	for (( i=0; $i<14; i++ )); do
 		rpo_array[$i]="${rpo:$i:1}";
 	done;
@@ -181,19 +181,73 @@ if [ "$temp" != "" ]; then input=$temp; fi;
 echo "Введите фамилию [$family]:";
 read temp;
 if [ "$temp" != "" ]; then
-	if [ "${temp:2:1}" = "" ] && ([ "${temp:1:1}" = "+" ] || [ "${temp:1:1}" = "-" ]  || [ "${temp:1:1}" = "=" ]); then
+#Вызов встроенной справки по использованию команд ввода/изменения фамилий
+	if [ "$temp" = "?" ]; then
+		echo;
+		echo "Использование встроенных команд:";
+		echo '"=" - пытается изменить фамилию на фамилию противоположного пола';
+		echo '"+СИМВОЛЫ", "=СИМВОЛЫ" - добавляет СИМВОЛЫ к окончанию текущей фамилии';
+		echo '"+-ФАМИЛИЯ", "=-ФАМИЛИЯ" - добавляет ФАМИЛИЮ к текущей (для создания двойной)';
+		echo '"-СИМВОЛЫ" - удаляет СИМВОЛЫ из окончания текущей фамилии';
+		echo '"--ФАМИЛИЯ" - удаляет ФАМИЛИЮ (только вторую!) из текущей двойной фамилии';
+		echo '"?" - вывод этой справки';
+		counter=$(($counter-1));
+		continue;
+	fi;
+#Проверка ввода пользователем пустых команд "+"/"-"	
+	if [ "${temp:2:1}" = "" ] && ([ "${temp:1:1}" = "+" ] || [ "${temp:1:1}" = "-" ] || [ "${temp:1:1}" = "=" ]); then
 		echo "Ошибка ввода. Попробуйте ещё раз";
 		counter=$(($counter-1));
 		continue;
+#Простая замена "йи"("ой")/"ая" и ""/"а" по команде "="
+#Первый проход для одиночной/первой части двойной фамилии 
+	elif [ "$temp" = "=" ]; then
+		temp2=`echo $family| sed "s/\([А-Яа-я]*\)\(-*\)\([А-Яа-я]*\)/\u\1/"`;
+		temp3=`echo $family| sed "s/\([А-Яа-я]*\)\(-*\)\([А-Яа-я]*\)/\u\3/"`;
+		temp=$((`echo "${#temp2}"`-2));
+		if [ "${temp2:$temp:2}" = "ая" ]; then
+			temp2=`echo $temp2| sed "s/\([А-Яа-я]*\)\("${temp2:$temp:2}"\)/\1ий/"`;
+		elif [ "${temp2:$temp:2}" = "ий" ] || [ "${temp2:$temp:2}" = "ой" ]; then
+			temp2=`echo $temp2| sed "s/\([А-Яа-я]*\)\("${temp2:$temp:2}"\)/\1ая/"`;
+		fi;
+		temp=$((`echo "${#temp2}"`-1));
+		if [ "${temp2:$temp:1}" = "а" ]; then
+			temp2=`echo $temp2| sed "s/\([А-Яа-я]*\)\("${temp2:$temp:1}"\)/\1/"`;
+		elif [ "${temp2:$temp:1}" != "й" ] && [ "${temp2:$temp:1}" != "я" ]; then
+			temp2=`echo $temp2| sed 's/\([А-Яа-я]*\)/\1а/'`;
+		fi;
+		family=$temp2;
+#Второй проход для второй части двойной фамилии
+		if [ -n "$temp3" ]; then 
+			temp=$((`echo "${#temp3}"`-2));
+			if [ "${temp3:$temp:2}" = "ая" ]; then
+				temp3=`echo $temp3| sed "s/\([А-Яа-я]*\)\("${temp3:$temp:2}"\)/\1ий/"`;
+			elif [ "${temp3:$temp:2}" = "ий" ] || [ "${temp3:$temp:2}" = "ой" ]; then
+				temp3=`echo $temp3| sed "s/\([А-Яа-я]*\)\("${temp3:$temp:2}"\)/\1ая/"`;
+			fi;
+			temp=$((`echo "${#temp3}"`-1));
+			if [ "${temp3:$temp:1}" = "а" ]; then
+				temp3=`echo $temp3| sed "s/\([А-Яа-я]*\)\("${temp3:$temp:1}"\)/\1/"`;
+			elif [ "${temp3:$temp:1}" != "й" ] && [ "${temp3:$temp:1}" != "я" ]; then
+				temp3=`echo $temp3| sed 's/\([А-Яа-я]*\)/\1а/'`;
+			fi;
+			family="$family-$temp3";
+		fi;
+#Добавление введённых пользователем символов к имеющейся фамилии
+#по команде "+ЗНАЧЕНИЕ"
 	elif ([ "${temp:0:1}" = "+" ] || [ "${temp:0:1}" = "=" ]) && [ "${temp:1:1}" != "-" ] && [ "${temp:1:1}" != "" ]; then
 		temp=`echo $temp| sed 's/\(+*=*\)\([а-я]*\)/\2/'`;
 		if [ "`echo $family| sed 's/\([А-Яа-я]*\)\(-*\)\([А-Яа-я]*\)/\3/'`" != "" ]; then
 			family=`echo $family| sed "s/\([А-Яа-я]*\)-\([А-Яа-я]*\)/\1$temp-\2$temp/"`;
 		else family=$family$temp;
 		fi;
+#Создание двойной фамилии из имеющейся и введённой пользователем
+#по команде "+-ЗНАЧЕНИЕ"
 	elif ([ "${temp:0:1}" = "+" ] || [ "${temp:0:1}" = "=" ])  && [ "${temp:1:1}" = "-" ] && [ "${temp:2:1}" != "" ]; then
 		temp=`echo $temp| sed 's/\(+*=*\)\(-\)\([а-я]*\)/\u\3/'`;
 		family="$family-$temp";
+#Удаление из фамилии введённых пользователем символов
+#по команде "-ЗНАЧЕНИЕ"
 	elif [ "${temp:0:1}" = "-" ] && [ "${temp:1:1}" != "-" ] && [ "${temp:1:1}" != "" ]; then 
 		temp=`echo $temp| sed 's/\(-\)\([а-я]*\)/\2/'`;
 		if [ "`echo $family| sed 's/\([А-Яа-я]*\)\(-*\)\([А-Яа-я]*\)/\3/'`" != "" ]; then
@@ -201,10 +255,19 @@ if [ "$temp" != "" ]; then
 		else
 		family=`echo $family| sed "s/\([а-я]*\)\($temp\)/\1/"`;
 		fi;
+#Создание одиночной фамилии из двойной путём удаления пользлвателем
+#второй части по команде "--ЗНАЧЕНИЕ"
 	elif [ "${temp:0:1}" = "-" ] && [ "${temp:1:1}" = "-" ] && [ "${temp:2:1}" != "" ]; then
 		temp=`echo $temp| sed 's/\(-\)\(-\)\([а-я]*\)/\2\u\3/'`;
 		family=`echo $family| sed "s/\([а-я]*\)\($temp\)/\1/"`;
-	else family=`echo $temp| sed "s/[а-я]/\u&/"`;
+#Создание фамилии непсредственно из того, что ввёл пользователь
+	else
+		temp2=`echo $temp| sed "s/\([А-Яа-я]*\)\(-*\)\([А-Яа-я]*\)/\u\1/"`;
+		temp3=`echo $temp| sed "s/\([А-Яа-я]*\)\(-*\)\([А-Яа-я]*\)/\u\3/"`;
+		if [ -z "$temp3" ]; then
+			family=$temp2;
+		else family="$temp2-$temp3";
+		fi;
 	fi;
 fi;
 echo "Введите инициалы [$initials]:";
@@ -239,7 +302,12 @@ read temp;
 if [ "$temp" != "" ]; then house=$temp; fi;
 echo "Введите квартиру [$flat]:";
 read temp;
-if [ "$temp" != "" ]; then flat=$temp; fi;
+if [ "$temp" != "" ]; then
+	if [ "$temp" = "+" ] || [ "$temp" = "=" ]; then
+		flat=$(($flat+1));
+	else flat=$temp;
+	fi;
+fi;
 
 #Проверка правильности ввода
 
@@ -378,7 +446,7 @@ for (( counter=1; $counter<=$quantity; counter++ )); do
 mv notice-$counter.tif notice-$(printf %03d $counter).tif;
 done;
 convert notice-*.tif Notices.pdf;
-lp -orientation-requested=3 Notices.pdf;
+#lp -orientation-requested=3 Notices.pdf;
 echo -n "Начало печати: " >> ../log;
 date +%T >> ../log;
 echo >> ../log;
