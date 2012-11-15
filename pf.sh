@@ -1,7 +1,7 @@
 #!/bin/bash
 #pf.sh
 #Внесение данных для печати извещений ф.22
-#Version 1.1
+#Version 1.2
 
 #Начало записи лога
 date "+%A %d %B %Y %T" >> log;
@@ -20,6 +20,7 @@ family=;
 initials=;
 street=;
 flat=;
+repeat=;
 temp=;
 temp2=;
 temp3=;
@@ -130,6 +131,8 @@ temp=;
 temp2=;
 temp3=;
 j=0;
+#Ввод ШПИ
+if [ "$repeat" = "rpo" ] || [ "$repeat" = "" ]; then
 echo "Введите ШПИ:";
 while [ "`tail -n 1 rpo.txt`" = "$rpo" ] && [ $j -lt 6 ]; do
 	sleep 1;
@@ -175,9 +178,15 @@ if [ "${rpo:0:6}" = 102536 ] || [ "${rpo:0:6}" = 102743 ] || [ "${rpo:0:6}" = 10
 	continue;
 fi;
 echo $rpo;
+fi;
+#Ввод входящего номера
+if [ "$repeat" = "input" ] || [ "$repeat" = "" ]; then
 echo "Введите входящий номер [$input]:";
 read temp;
 if [ "$temp" != "" ]; then input=$temp; fi;
+fi;
+#Ввод фамилии
+if [ "$repeat" = "family" ] || [ "$repeat" = "" ]; then
 echo "Введите фамилию [$family]:";
 read temp;
 if [ "$temp" != "" ]; then
@@ -270,17 +279,37 @@ if [ "$temp" != "" ]; then
 		fi;
 	fi;
 fi;
+fi;
+#Ввод инициалов
+if [ "$repeat" = "initials" ] || [ "$repeat" = "" ]; then
 echo "Введите инициалы [$initials]:";
 read temp;
 if [ "$temp" != "" ]; then
+	j=1;
 	length=`echo "${#temp}"`;
-	if [ $length = 3 ]; then initials=`echo $temp| sed 's/\([а-я]\) \([а-я]\)/\u\1. \u\2./'`;
+	if [ "${temp:0:1}" = "*" ] && [ $length -gt 1 ]; then
+		initials="";
+		for (( i=1; $i<$length; i++ )); do
+			if [ "${temp:$i:1}" = " " ] || [ "${temp:$(($i+1)):1}" = "" ]; then
+				temp2=`echo "${temp:$j:$(($i-$j+1))}"| sed 's/\([А-Яа-я]*\)/\u\1/'`;
+				j=$(($i+1));
+			fi;
+			initials=$initials$temp2;
+			temp2=;
+		done;
+	elif [ $length = 3 ]; then initials=`echo $temp| sed 's/\([а-я]\) \([а-я]\)/\u\1. \u\2./'`;
 	elif [ $length = 5 ]; then initials=`echo $temp|sed 's/\([а-я]\) \([а-я]\) \([а-я]\)/\u\1. \u\2.-\3./'`;
-	else echo "Ошибка ввода. Попробуйте ещё раз";
-	counter=$(($counter-1));
-	continue;
+	else
+		echo "Ошибка ввода. Попробуйте ещё раз";
+		echo "(инициалы через пробел или *ЗНАЧЕНИЕ для любого набора символов).";
+		echo;
+		counter=$(($counter-1));
+		continue;
 	fi;
 fi;
+fi;
+#Ввод улицы
+if [ "$repeat" = "street" ] || [ "$repeat" = "" ]; then
 echo "Введите улицу [$street]:";
 read temp;
 if [ "$temp" != "" ]; then
@@ -297,9 +326,15 @@ fi;
 done;
 if [ $i = $length ]; then street=`echo $temp| sed "s/[а-я]/\u&/"`; fi;
 fi;
+fi;
+#Ввод номера дома
+if [ "$repeat" = "house" ] || [ "$repeat" = "" ]; then
 echo "Введите номер дома [$house]:";
 read temp;
 if [ "$temp" != "" ]; then house=$temp; fi;
+fi;
+#Ввод номера квартиры
+if [ "$repeat" = "flat" ] || [ "$repeat" = "" ]; then
 echo "Введите квартиру [$flat]:";
 read temp;
 if [ "$temp" != "" ]; then
@@ -307,6 +342,7 @@ if [ "$temp" != "" ]; then
 		flat=$(($flat+1));
 	else flat=$temp;
 	fi;
+fi;
 fi;
 
 #Проверка правильности ввода
@@ -318,8 +354,64 @@ echo $street $house\-$flat;
 echo $rpo;
 echo;
 echo "Всё верно [Д/н]?";
-read temp;
-if [ "$temp" != "" ] && ( [ $temp = "Н" ] || [ $temp = "н" ] ); then counter=$(($counter-1)); continue; fi;
+read repeat;
+while [ "$repeat" != "" ] && [ "$repeat" != "Д" ] && [ "$repeat" != "д" ]; do
+	if [ "$repeat" = "Н" ] || [ "$repeat" = "н" ]; then
+		repeat="";
+		counter=$(($counter-1));
+		continue 2;
+	fi;
+	if [ "$repeat" = "Ш" ] || [ "$repeat" = "ш" ]; then
+		repeat=rpo;
+		counter=$(($counter-1));
+		continue 2;
+	fi;
+	if [ "$repeat" = "В" ] || [ "$repeat" = "в" ]; then
+		repeat=input;
+		counter=$(($counter-1));
+		continue 2;
+	fi;
+	if [ "$repeat" = "Ф" ] || [ "$repeat" = "ф" ]; then
+		repeat=family;
+		counter=$(($counter-1));
+		continue 2;
+	fi;
+	if [ "$repeat" = "И" ] || [ "$repeat" = "и" ]; then
+		repeat=initials;
+		counter=$(($counter-1));
+		continue 2;
+	fi;
+	if [ "$repeat" = "У" ] || [ "$repeat" = "у" ]; then
+		repeat=street;
+		counter=$(($counter-1));
+		continue 2;
+	fi;
+	if [ "$repeat" = "С" ] || [ "$repeat" = "с" ]; then
+		repeat=house;
+		counter=$(($counter-1));
+		continue 2;
+	fi;
+	if [ "$repeat" = "К" ] || [ "$repeat" = "к" ]; then
+		repeat=flat;
+		counter=$(($counter-1));
+		continue 2;
+	fi;
+#Встроенная справка по использованию команд для частичного редактирования
+#введённых данных
+	echo "Использование:";
+	echo '"д" - всё верно, переход к следующему письму (значение по умолчанию)';
+	echo '"н" - ввод всей информации о данном письме заново';
+	echo '"ш" - ввести другой ШПИ';
+	echo '"в" - исправить входящий номер';
+	echo '"ф" - исправить фамилию';
+	echo '"и" - исправить инициалы';
+	echo '"у" - исправить название улицы';
+	echo '"с" - исправить номер дома (строения)';
+	echo '"к" - исправить номер квартиры';
+	echo "Что Вы хотите исправить?";
+	echo "Или всё верно?";
+	read repeat;
+done;
 
 #Запись данных в файл
 
