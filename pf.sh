@@ -109,7 +109,7 @@ if [ $blank = 1 ] && [ "${#form}" -gt 0 ]; then
 	exit;
 fi;
 if [ -n "$fake" ] && [ $blank = 1 ]; then
-	echo "Параметр $fake может применяться только совместно с параметром --blank=2";
+	echo "Параметр -f|--fake может применяться только совместно с параметром --blank=2";
 	exit;
 fi;
 
@@ -537,7 +537,7 @@ cd ..
 ghostscript  -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=jpeg -r150 -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -dMaxStripSize=8192 -sOutputFile=page-%d.jpg notice.ps
 if [ $blank = 1 ]; then
 	temp1=+200;
-	temp2=+55;
+	temp2=+50;
 elif [ "$form" = "n" ]; then
 	temp1=+310;
 	temp2=+5;
@@ -557,7 +557,7 @@ for (( counter=1; $counter<=$quantity; counter++ )); do
 mv notice-$counter.tif notice-$(printf %03d $counter).tif;
 done;
 convert notice-*.tif Notices.pdf;
-#lp -orientation-requested=3 Notices.pdf;
+lp -orientation-requested=3 Notices.pdf;
 echo -n "Начало печати: " >> ../log;
 date +%T >> ../log;
 echo >> ../log;
