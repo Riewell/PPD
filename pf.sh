@@ -1,7 +1,7 @@
 #!/bin/bash
 #pf.sh
 #Внесение данных для печати извещений ф.22
-#Version 1.3.1
+#Version 1.3.2
 
 #Начало записи лога
 date "+%A %d %B %Y %T" >> log;
@@ -14,6 +14,7 @@ blank=;
 form=;
 quantity=;
 fake=;
+visual_counter=0;
 lock=1;
 rpo=;
 input=;
@@ -22,6 +23,7 @@ initials=;
 street=;
 flat=;
 repeat=;
+repeat_continue=0;
 temp=;
 temp2=;
 temp3=;
@@ -91,6 +93,11 @@ case $param in
 	shift;
 	i=$(($i+1));
 	continue;;
+( -c | --counter )
+	visual_counter=1;
+	shift;
+	i=$(($i+1));
+	continue;;
 ( -h | --help )
 	cat readme;
 	exit;;
@@ -109,7 +116,7 @@ if [ $blank = 1 ] && [ "${#form}" -gt 0 ]; then
 	exit;
 fi;
 if [ -n "$fake" ] && [ $blank = 1 ]; then
-	echo "Параметр -f|--fake может применяться только совместно с параметром --blank=2";
+	echo "Параметр -f|--fake может применяться только совместно с параметром --blank 2";
 	exit;
 fi;
 
@@ -134,7 +141,8 @@ echo -n "Начало ввода: " >> ../log;
 date +%T >> ../log;
 
 #Считывание ШПИ через веб-камеру
-zbarcam --nodisplay --raw >> rpo.txt &
+#zbarcam --nodisplay --raw >> rpo.txt &
+zbarcam --raw >> rpo.txt &
 
 for (( counter=1; $counter<=$quantity; counter++ )); do
 temp=;
@@ -143,6 +151,9 @@ temp3=;
 j=0;
 #Ввод ШПИ
 if [ "$repeat" = "rpo" ] || [ "$repeat" = "" ]; then
+if [ $visual_counter -eq 1 ]; then
+	echo "№$counter из $quantity";
+fi;
 echo "Введите ШПИ:";
 while [ "`tail -n 1 rpo.txt`" = "$rpo" ] && [ $j -lt 6 ]; do
 	sleep 1;
@@ -156,6 +167,7 @@ if [ "$rpo" = "`tail -n 1 rpo.txt`" ]; then
 fi;
 if [ "${#rpo}" -lt 14 ]; then
 		echo "Ошибка ввода. Попробуйте ещё раз.";
+		echo;
 		counter=$(($counter-1));	
 		continue;
 fi;
@@ -179,11 +191,13 @@ if [ "${rpo:0:6}" = 102536 ] || [ "${rpo:0:6}" = 102743 ] || [ "${rpo:0:6}" = 10
 	done;
 	if [ "${rpo_array[13]}" != "$temp3" ]; then
 		echo "Ошибка ввода. Попробуйте ещё раз.";
+		echo;
 		counter=$(($counter-1));	
 		continue;
 	fi;
 	else
 	echo "Ошибка ввода. Попробуйте ещё раз.";
+	echo;
 	counter=$(($counter-1));	
 	continue;
 fi;
@@ -210,12 +224,17 @@ if [ "$temp" != "" ]; then
 		echo '"-СИМВОЛЫ" - удаляет СИМВОЛЫ из окончания текущей фамилии';
 		echo '"--ФАМИЛИЯ" - удаляет ФАМИЛИЮ (только вторую!) из текущей двойной фамилии';
 		echo '"?" - вывод этой справки';
+		repeat=family;
+		repeat_continue=1;
 		counter=$(($counter-1));
 		continue;
 	fi;
 #Проверка ввода пользователем пустых команд "+"/"-"	
 	if [ "${temp:2:1}" = "" ] && ([ "${temp:1:1}" = "+" ] || [ "${temp:1:1}" = "-" ] || [ "${temp:1:1}" = "=" ]); then
 		echo "Ошибка ввода. Попробуйте ещё раз";
+		echo;
+		repeat=family;
+		repeat_continue=1;		
 		counter=$(($counter-1));
 		continue;
 #Простая замена "йи"("ой")/"ая" и ""/"а" по команде "="
@@ -289,6 +308,10 @@ if [ "$temp" != "" ]; then
 		fi;
 	fi;
 fi;
+if [ $repeat_continue -eq 1 ]; then
+	repeat="";
+	repeat_continue=0;
+fi;
 fi;
 #Ввод инициалов
 if [ "$repeat" = "initials" ] || [ "$repeat" = "" ]; then
@@ -299,6 +322,7 @@ if [ "$temp" != "" ]; then
 	length=`echo "${#temp}"`;
 	if [ "${temp:0:1}" = "*" ] && [ $length -gt 1 ]; then
 		initials="";
+		temp2="";
 		for (( i=1; $i<$length; i++ )); do
 			if [ "${temp:$i:1}" = " " ] || [ "${temp:$(($i+1)):1}" = "" ]; then
 				temp2=`echo "${temp:$j:$(($i-$j+1))}"| sed 's/\([А-Яа-я]*\)/\u\1/'`;
@@ -313,9 +337,15 @@ if [ "$temp" != "" ]; then
 		echo "Ошибка ввода. Попробуйте ещё раз";
 		echo "(инициалы через пробел или *ЗНАЧЕНИЕ для любого набора символов).";
 		echo;
+		repeat=initials;
+		repeat_continue=1;
 		counter=$(($counter-1));
 		continue;
 	fi;
+fi;
+if [ $repeat_continue -eq 1 ]; then
+	repeat="";
+	repeat_continue=0;
 fi;
 fi;
 #Ввод улицы
@@ -531,6 +561,8 @@ cp content.xml notice/;
 cd notice/;
 7z a -tzip notice.zip;
 mv notice.zip notice.odt;
+echo;
+echo "Подготовка к печати...";
 libreoffice --invisible --print-to-file notice.odt;
 cp notice.ps ../
 cd ..
@@ -561,3 +593,6 @@ lp -orientation-requested=3 Notices.pdf;
 echo -n "Начало печати: " >> ../log;
 date +%T >> ../log;
 echo >> ../log;
+#Удаление временных файлов
+echo "Удаление временных файлов...";
+ls -Q| grep -v "Notices.pdf" | xargs rm -r;
